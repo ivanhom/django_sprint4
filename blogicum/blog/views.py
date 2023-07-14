@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from blog.forms import CommentForm, PostForm, UserForm
 from blog.models import Category, Comment, Post, User
+from blogicum.settings import PER_PAGE
 
 
 def index(request):
@@ -15,14 +16,14 @@ def index(request):
         is_published=True,
         category__is_published=True
     )
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'page_obj': page_obj}
     return render(request, 'blog/index.html', context)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def create_post(request):
     """Создание новой публикации."""
     form = PostForm(
@@ -31,6 +32,7 @@ def create_post(request):
     )
     context = {'form': form}
     if form.is_valid():
+        form.save(commit=False)
         form.instance.author = request.user
         form.save()
         return redirect('blog:profile', username=request.user)
@@ -49,14 +51,15 @@ def post_detail(request, post_id):
             pk=post_id
         )
     form = CommentForm()
-    comments = Comment.objects.filter(post_id=post_id)
+    comments = post.comments.all()
     context = {'post': post, 'form': form, 'comments': comments}
     return render(request, 'blog/detail.html', context)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def edit_post(request, post_id):
     """Редактирование публикации."""
+    edit_post = True
     instance = get_object_or_404(Post, pk=post_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
@@ -65,28 +68,29 @@ def edit_post(request, post_id):
         files=request.FILES or None,
         instance=instance
     )
-    context = {'form': form}
+    context = {'form': form, 'edit_post': edit_post}
     if form.is_valid():
         form.save()
         return redirect('blog:post_detail', post_id=post_id)
     return render(request, 'blog/create.html', context)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def delete_post(request, post_id):
     """Удаление публикации."""
+    delete_post = True
     instance = get_object_or_404(Post, pk=post_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
     form = PostForm(instance=instance)
-    context = {'form': form}
+    context = {'form': form, 'delete_post': delete_post}
     if request.method == 'POST':
         instance.delete()
         return redirect('blog:index')
     return render(request, 'blog/create.html', context)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def add_comment(request, post_id):
     """Добавление комментария к публикации."""
     post = get_object_or_404(Post, pk=post_id)
@@ -99,9 +103,10 @@ def add_comment(request, post_id):
     return redirect('blog:post_detail', post_id=post_id)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def edit_comment(request, post_id, comment_id):
     """Редактирование комментария к публикации."""
+    edit_comment = True
     instance = get_object_or_404(Comment, post=post_id, pk=comment_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
@@ -109,19 +114,24 @@ def edit_comment(request, post_id, comment_id):
         request.POST or None,
         instance=instance
     )
-    context = {'comment': instance, 'form': form}
+    context = {
+        'comment': instance,
+        'form': form,
+        'edit_comment': edit_comment
+    }
     if form.is_valid():
         form.save()
     return render(request, 'blog/comment.html', context)
 
 
-@login_required(login_url='/auth/login/')
+@login_required
 def delete_comment(request, post_id, comment_id):
     """Удаление комментария к публикации."""
+    delete_comment = True
     instance = get_object_or_404(Comment, post=post_id, pk=comment_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
-    context = {'comment': instance}
+    context = {'comment': instance, 'delete_comment': delete_comment}
     if request.method == 'POST':
         instance.delete()
         return redirect('blog:index')
@@ -131,25 +141,27 @@ def delete_comment(request, post_id, comment_id):
 def profile(request, username):
     """Страница профиля пользователя."""
     profile = get_object_or_404(User, username=username)
-    if request.user.username == username:
-        post_list = profile.posts.filter(author_id=profile.id)
-    else:
-        post_list = Post.objects.filter(
+    post_list = profile.posts.all()
+    if request.user.username != username:
+        post_list = post_list.filter(
             author_id=profile.id,
             pub_date__lte=timezone.now(),
             is_published=True,
             category__is_published=True
         )
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'profile': profile, 'page_obj': page_obj}
     return render(request, 'blog/profile.html', context)
 
 
+@login_required
 def edit_profile(request):
     """Редактирование информации профиля пользователя."""
     instance = get_object_or_404(User, username=request.user)
+    if request.user.username != instance.username:
+        return redirect('blog:index')
     form = UserForm(
         request.POST or None,
         instance=instance
@@ -171,7 +183,7 @@ def category_posts(request, category_slug):
         is_published=True,
         pub_date__lte=timezone.now()
     )
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, PER_PAGE)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'category': category, 'page_obj': page_obj}
