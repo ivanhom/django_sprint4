@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% load django_bootstrap5 %}
 {% block title %}
-  {% if edit_post %}
+  {% if is_edit %}
     Редактирование публикации
-  {% elif delete_post %}
+  {% elif is_delete %}
     Удаление публикации
   {% else %}
     Добавление публикации
@@ -13,9 +13,9 @@
   <div class="col d-flex justify-content-center">
     <div class="card" style="width: 40rem;">
       <div class="card-header">
-        {% if edit_post %}
+        {% if is_edit %}
           Редактирование публикации
-        {% elif delete_post %}
+        {% elif is_delete %}
           Удаление публикации
         {% else %}
           Добавление публикации
@@ -24,7 +24,7 @@
       <div class="card-body">
         <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
-          {% if not delete_post %}
+          {% if not is_delete %}
             {% bootstrap_form form %}
           {% else %}
             <article>

@@ -59,7 +59,7 @@ def post_detail(request, post_id):
 @login_required
 def edit_post(request, post_id):
     """Редактирование публикации."""
-    edit_post = True
+    is_edit = True
     instance = get_object_or_404(Post, pk=post_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
@@ -68,7 +68,7 @@ def edit_post(request, post_id):
         files=request.FILES or None,
         instance=instance
     )
-    context = {'form': form, 'edit_post': edit_post}
+    context = {'form': form, 'is_edit': is_edit}
     if form.is_valid():
         form.save()
         return redirect('blog:post_detail', post_id=post_id)
@@ -78,12 +78,12 @@ def edit_post(request, post_id):
 @login_required
 def delete_post(request, post_id):
     """Удаление публикации."""
-    delete_post = True
+    is_delete = True
     instance = get_object_or_404(Post, pk=post_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
     form = PostForm(instance=instance)
-    context = {'form': form, 'delete_post': delete_post}
+    context = {'form': form, 'is_delete': is_delete}
     if request.method == 'POST':
         instance.delete()
         return redirect('blog:index')
@@ -106,7 +106,7 @@ def add_comment(request, post_id):
 @login_required
 def edit_comment(request, post_id, comment_id):
     """Редактирование комментария к публикации."""
-    edit_comment = True
+    is_edit = True
     instance = get_object_or_404(Comment, post=post_id, pk=comment_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
@@ -114,11 +114,7 @@ def edit_comment(request, post_id, comment_id):
         request.POST or None,
         instance=instance
     )
-    context = {
-        'comment': instance,
-        'form': form,
-        'edit_comment': edit_comment
-    }
+    context = {'comment': instance, 'form': form, 'is_edit': is_edit}
     if form.is_valid():
         form.save()
     return render(request, 'blog/comment.html', context)
@@ -127,11 +123,11 @@ def edit_comment(request, post_id, comment_id):
 @login_required
 def delete_comment(request, post_id, comment_id):
     """Удаление комментария к публикации."""
-    delete_comment = True
+    is_delete = True
     instance = get_object_or_404(Comment, post=post_id, pk=comment_id)
     if request.user != instance.author:
         return redirect('blog:post_detail', post_id=post_id)
-    context = {'comment': instance, 'delete_comment': delete_comment}
+    context = {'comment': instance, 'is_delete': is_delete}
     if request.method == 'POST':
         instance.delete()
         return redirect('blog:index')
@@ -144,7 +140,6 @@ def profile(request, username):
     post_list = profile.posts.all()
     if request.user.username != username:
         post_list = post_list.filter(
-            author_id=profile.id,
             pub_date__lte=timezone.now(),
             is_published=True,
             category__is_published=True
